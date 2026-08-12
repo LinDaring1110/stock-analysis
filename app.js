@@ -174,23 +174,22 @@ async function gather() {
     star: { key: 'star', name: '科创板', items: rankBoard(star) }
   };
 
-  // 板块级兜底：实时拉取为空时，回退到内嵌算法快照，保证永不空白
-  const snap = window.SNAPSHOT;
-  if (snap && snap.boards) {
-    if (boards.sh_main.items.length === 0 && snap.boards.sh_main) {
-      boards.sh_main = snap.boards.sh_main;          // 整块替换，连名称/信号一并兜底
-      warns.push('上证主板实时获取失败，已显示已存储数据');
+  // 板块级兜底：实时拉取为空时，优先回退到【本地活快照】（最近一次成功刷新写入的数据），
+  // 没有本地快照时才用内嵌算法快照兜底，保证永不空白
+  const cache = loadCache();
+  const fb = (cache && cache.boards) ? cache : (window.SNAPSHOT || null);
+  let usedFallback = false;
+  if (fb && fb.boards) {
+    if (boards.sh_main.items.length === 0 && fb.boards.sh_main) {
+      boards.sh_main = fb.boards.sh_main;
+      usedFallback = true;
+      warns.push('上证主板实时获取失败，已显示已存储快照');
     }
-    if (boards.star.items.length === 0 && snap.boards.star) {
-      boards.star = snap.boards.star;
-      warns.push('科创板实时获取失败，已显示已存储数据');
+    if (boards.star.items.length === 0 && fb.boards.star) {
+      boards.star = fb.boards.star;
+      usedFallback = true;
+      warns.push('科创板实时获取失败，已显示已存储快照');
     }
-  }
-
-  // 终极兜底：若快照也未加载且某板块仍为空，绝不让界面留白
-  if ((!boards.sh_main.items.length || !boards.star.items.length) && snap && snap.boards) {
-    if (!boards.sh_main.items.length && snap.boards.sh_main) boards.sh_main = snap.boards.sh_main;
-    if (!boards.star.items.length && snap.boards.star) boards.star = snap.boards.star;
   }
 
   if (!news || !news.length) news = deriveNews(boards);
@@ -199,7 +198,7 @@ async function gather() {
   return {
     updatedAt: new Date().toISOString(),
     source: warns.length ? '东方财富实时（部分显示已存储数据）' : '东方财富（浏览器实时 JSONP 获取）',
-    live: !usedSnap,
+    live: !usedSnap && !usedFallback,
     warns, indices, boards, news
   };
 }
@@ -321,46 +320,57 @@ async function refresh() {
     const valid = data.boards.sh_main.items.length > 0 && data.boards.star.items.length > 0;
 
     if (valid) {
-      // ✅ 拿到有效最新数据 → 覆盖存储 → 渲染新数据
+      // ✅ 拿到有效最新数据 → 更新本地快照（覆盖存储）→ 渲染新数据
       saveCache(data);
       renderAll(data);
-      renderLiveFlag(!data.warns || !data.warns.length);
+      renderLiveFlag(data.live);   // data.live=true 表示本批数据全部来自实时拉取
     } else {
-      // ⚠️ 实时未拿到有效数据 → 不动存储，继续显示已存的旧数据
+      // ⚠️ 实时未拿到有效数据 → 不动存储，继续显示已存的本地快照
       const store = loadCache() || window.SNAPSHOT;
       renderAll(store);
-      renderWarns(['实时数据获取不完整，已继续显示已存储数据']);
-      renderLiveFlag(false);
+      renderWarns(['实时数据获取不完整，已继续显示已存储快照']);
+      renderLiveFlag(false, store && store.updatedAt);
     }
   } catch (e) {
-    // ❌ 整段实时拉取异常 → 保留旧存储，继续显示已存数据，绝不空白
+    // ❌ 整段实时拉取异常 → 保留旧存储，继续显示已存的本地快照，绝不空白
     const store = loadCache() || window.SNAPSHOT;
     renderAll(store);
-    renderWarns(['实时数据获取失败（' + (e && e.message || '网络异常') + '），已继续显示已存储数据']);
-    renderLiveFlag(false);
+    renderWarns(['实时数据获取失败（' + (e && e.message || '网络异常') + '），已继续显示已存储快照']);
+    renderLiveFlag(false, store && store.updatedAt);
   } finally {
     btn.disabled = false; btn.textContent = '⟳ 刷新实时数据';
   }
 }
 
-function renderLiveFlag(state) {
+function fmtTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2, '0');
+  return pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+function renderLiveFlag(state, snapTs) {
   const el = $('#liveFlag');
   if (state === 'loading') {
-    el.textContent = '⟳ 正在获取实时数据…（当前显示已存储数据）';
+    el.textContent = '⟳ 正在获取实时数据…（当前显示已存储快照）';
     el.classList.remove('live', 'snap'); el.classList.add('loading');
   } else if (state === true) {
-    el.textContent = '● 浏览器实时'; el.classList.add('live'); el.classList.remove('snap', 'loading');
+    el.textContent = '● 浏览器实时 · 本地快照已更新'; el.classList.add('live'); el.classList.remove('snap', 'loading');
   } else {
-    el.textContent = '● 显示已存储数据（实时获取失败）'; el.classList.add('snap'); el.classList.remove('live', 'loading');
+    let txt = '● 显示已存储快照';
+    if (snapTs) txt += '（更新于 ' + fmtTime(snapTs) + '）';
+    txt += '（本次实时获取失败）';
+    el.textContent = txt;
+    el.classList.add('snap'); el.classList.remove('live', 'loading');
   }
 }
 
 /* ---------------------- 启动 ---------------------- */
 async function init() {
-  // 首屏先用内嵌快照渲染（永不空白、秒开），再后台尝试实时刷新
-  if (window.SNAPSHOT) { renderAll(window.SNAPSHOT); renderLiveFlag(false); }
+  // 首屏优先显示【最近一次成功刷新的本地快照】（永不空白、秒开），
+  // 本地无快照时才用内嵌算法快照兜底，再后台尝试实时刷新
   const cached = loadCache();
-  if (cached) { renderAll(cached); }
+  if (cached) { renderAll(cached); renderLiveFlag(false, cached.updatedAt); }
+  else if (window.SNAPSHOT) { renderAll(window.SNAPSHOT); renderLiveFlag(false, window.SNAPSHOT.updatedAt); }
   await refresh();
   $('#refreshBtn').addEventListener('click', refresh);
   // 页面打开时也记录一次时间，避免用户刚进页面就连点刷新
