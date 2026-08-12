@@ -1,7 +1,17 @@
 /* =========================================================================
- * 股票利好分析 · 静态版（无后端）
+ * 股票利好分析 · 静态版（无后端，但采用「存储即真相」架构）
+ *
+ * 数据流（用户期望的模式）：
+ *   1) 启动时：先把【已存储的数据】渲染到界面（来自 localStorage，
+ *      首次无缓存则用内嵌算法快照 snapshot.js 兜底）——界面永远不空白。
+ *   2) 点击「刷新」：后台去拉取最新实时数据；在拉取过程中，界面继续
+ *      显示【刷新前的旧数据】，不闪烁、不留白。
+ *   3) 拉取成功且数据有效 → 用最新数据【覆盖存储】→ 界面渲染新数据。
+ *   4) 拉取失败 / 超时 / 返回空 → 【保留旧存储】，界面继续显示旧数据，
+ *      并提示「已继续显示上次数据」，绝不出现没有数据的情况。
+ *
  * 数据：浏览器通过 JSONP 直接拉取东方财富（push2 / np-anotice）
- * 存储：localStorage（刷新时整体覆盖）
+ * 存储：localStorage（仅当拿到有效数据时才覆盖写入）
  * 部署：推到 GitHub 后开启 Pages 即可公网访问
  * ========================================================================= */
 
@@ -159,13 +169,19 @@ async function gather() {
   const snap = window.SNAPSHOT;
   if (snap && snap.boards) {
     if (boards.sh_main.items.length === 0 && snap.boards.sh_main) {
-      boards.sh_main.items = snap.boards.sh_main.items;
+      boards.sh_main = snap.boards.sh_main;          // 整块替换，连名称/信号一并兜底
       warns.push('上证主板实时获取失败，已回退算法快照');
     }
     if (boards.star.items.length === 0 && snap.boards.star) {
-      boards.star.items = snap.boards.star.items;
+      boards.star = snap.boards.star;
       warns.push('科创板实时获取失败，已回退算法快照');
     }
+  }
+
+  // 终极兜底：若快照也未加载且某板块仍为空，绝不让界面留白
+  if ((!boards.sh_main.items.length || !boards.star.items.length) && snap && snap.boards) {
+    if (!boards.sh_main.items.length && snap.boards.sh_main) boards.sh_main = snap.boards.sh_main;
+    if (!boards.star.items.length && snap.boards.star) boards.star = snap.boards.star;
   }
 
   if (!news || !news.length) news = deriveNews(boards);
@@ -268,33 +284,54 @@ function renderAll(data) {
   $('#source').textContent = '数据来源：' + (data.source || '—');
 }
 
-/* ---------------------- 刷新（重新拉取 + 覆盖） ---------------------- */
+/* ---------------------- 刷新（后台拉取 + 覆盖存储） ----------------------
+ * 关键原则（用户要求）：
+ *   - 刷新期间界面继续显示【刷新前的旧数据】，不空白；
+ *   - 只有拿到「有效数据」（两个板块都有股票）才覆盖 localStorage；
+ *   - 拉取失败 / 超时 / 返回空 → 保留旧存储，继续显示旧数据并提示。
+ * ------------------------------------------------------------------------- */
 async function refresh() {
   const btn = $('#refreshBtn');
   btn.disabled = true; btn.textContent = '⟳ 拉取中…';
+  renderLiveFlag('loading');   // 顶部显示「正在获取」，同时旧数据仍留在界面
+
   try {
     const data = await gather();
-    saveCache(data);          // 覆盖本地存储
-    renderAll(data);
-    renderLiveFlag(!data.warns || !data.warns.length);
-  } catch (e) {
-    // 整段实时拉取失败：回退到内嵌算法快照（永不空白）
-    if (window.SNAPSHOT) {
-      renderAll(window.SNAPSHOT);
-      renderWarns(['实时数据拉取失败，已回退最近一次算法快照']);
-      renderLiveFlag(false);
+    const valid = data.boards.sh_main.items.length > 0 && data.boards.star.items.length > 0;
+
+    if (valid) {
+      // ✅ 拿到有效最新数据 → 覆盖存储 → 渲染新数据
+      saveCache(data);
+      renderAll(data);
+      renderLiveFlag(!data.warns || !data.warns.length);
     } else {
-      alert('实时数据拉取失败：' + e.message + '\n请检查网络或东方财富接口可达性。');
+      // ⚠️ 实时未拿到有效数据 → 不动存储，继续显示已存的旧数据
+      const store = loadCache() || window.SNAPSHOT;
+      renderAll(store);
+      renderWarns(['实时数据获取不完整，已继续显示上次 / 快照数据']);
+      renderLiveFlag(false);
     }
+  } catch (e) {
+    // ❌ 整段实时拉取异常 → 保留旧存储，继续显示已存数据，绝不空白
+    const store = loadCache() || window.SNAPSHOT;
+    renderAll(store);
+    renderWarns(['实时数据获取失败（' + (e && e.message || '网络异常') + '），已继续显示上次 / 快照数据']);
+    renderLiveFlag(false);
   } finally {
     btn.disabled = false; btn.textContent = '⟳ 刷新实时数据';
   }
 }
 
-function renderLiveFlag(live) {
+function renderLiveFlag(state) {
   const el = $('#liveFlag');
-  if (live) { el.textContent = '● 浏览器实时'; el.classList.add('live'); el.classList.remove('snap'); }
-  else { el.textContent = '● 快照模式'; el.classList.remove('live'); el.classList.add('snap'); }
+  if (state === 'loading') {
+    el.textContent = '⟳ 正在获取实时数据…（当前显示上次数据）';
+    el.classList.remove('live', 'snap'); el.classList.add('loading');
+  } else if (state === true) {
+    el.textContent = '● 浏览器实时'; el.classList.add('live'); el.classList.remove('snap', 'loading');
+  } else {
+    el.textContent = '● 快照模式（显示已存储数据）'; el.classList.add('snap'); el.classList.remove('live', 'loading');
+  }
 }
 
 /* ---------------------- 启动 ---------------------- */
