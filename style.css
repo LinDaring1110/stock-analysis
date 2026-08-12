@@ -32,8 +32,12 @@ body {
 .topbar h1 { font-size: 20px; font-weight: 700; }
 .subtitle { font-size: 12px; color: var(--muted); }
 .actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.live { font-size: 12px; color: var(--down); }
-.live.snap { color: var(--gold); }
+.live { font-size: 12px; color: var(--down); }       /* 实时（绿） */
+.snap { color: var(--gold); }                          /* 快照模式（金） */
+.live.loading { color: #4aa3ff; animation: pulse 1.1s ease-in-out infinite; }
+
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+@media (max-width: 600px) { .live, .snap, .live.loading { font-size: 11px; } }
 .updated { font-size: 12px; color: var(--muted); }
 .btn-refresh {
   background: var(--accent); color: #fff; border: none;
