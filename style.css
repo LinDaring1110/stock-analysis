@@ -33,6 +33,7 @@ body {
 .subtitle { font-size: 12px; color: var(--muted); }
 .actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .live { font-size: 12px; color: var(--down); }
+.live.snap { color: var(--gold); }
 .updated { font-size: 12px; color: var(--muted); }
 .btn-refresh {
   background: var(--accent); color: #fff; border: none;
