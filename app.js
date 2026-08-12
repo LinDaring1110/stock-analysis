@@ -154,12 +154,27 @@ async function gather() {
     sh_main: { key: 'sh_main', name: '上证主板', items: rankBoard(shMain) },
     star: { key: 'star', name: '科创板', items: rankBoard(star) }
   };
+
+  // 板块级兜底：实时拉取为空时，回退到内嵌算法快照，保证永不空白
+  const snap = window.SNAPSHOT;
+  if (snap && snap.boards) {
+    if (boards.sh_main.items.length === 0 && snap.boards.sh_main) {
+      boards.sh_main.items = snap.boards.sh_main.items;
+      warns.push('上证主板实时获取失败，已回退算法快照');
+    }
+    if (boards.star.items.length === 0 && snap.boards.star) {
+      boards.star.items = snap.boards.star.items;
+      warns.push('科创板实时获取失败，已回退算法快照');
+    }
+  }
+
   if (!news || !news.length) news = deriveNews(boards);
 
+  const usedSnap = boards.sh_main.items.length && boards.sh_main.items[0].source === 'algorithm';
   return {
     updatedAt: new Date().toISOString(),
-    source: '东方财富（浏览器实时 JSONP 获取）',
-    live: true,
+    source: warns.length ? '东方财富实时（部分回退算法快照）' : '东方财富（浏览器实时 JSONP 获取）',
+    live: !usedSnap,
     warns, indices, boards, news
   };
 }
@@ -261,18 +276,33 @@ async function refresh() {
     const data = await gather();
     saveCache(data);          // 覆盖本地存储
     renderAll(data);
+    renderLiveFlag(!data.warns || !data.warns.length);
   } catch (e) {
-    alert('实时数据拉取失败：' + e.message + '\n请检查网络或东方财富接口可达性。');
+    // 整段实时拉取失败：回退到内嵌算法快照（永不空白）
+    if (window.SNAPSHOT) {
+      renderAll(window.SNAPSHOT);
+      renderWarns(['实时数据拉取失败，已回退最近一次算法快照']);
+      renderLiveFlag(false);
+    } else {
+      alert('实时数据拉取失败：' + e.message + '\n请检查网络或东方财富接口可达性。');
+    }
   } finally {
     btn.disabled = false; btn.textContent = '⟳ 刷新实时数据';
   }
 }
 
+function renderLiveFlag(live) {
+  const el = $('#liveFlag');
+  if (live) { el.textContent = '● 浏览器实时'; el.classList.add('live'); el.classList.remove('snap'); }
+  else { el.textContent = '● 快照模式'; el.classList.remove('live'); el.classList.add('snap'); }
+}
+
 /* ---------------------- 启动 ---------------------- */
 async function init() {
-  // 先展示本地缓存（若有），再后台刷新到最新
+  // 首屏先用内嵌快照渲染（永不空白、秒开），再后台尝试实时刷新
+  if (window.SNAPSHOT) { renderAll(window.SNAPSHOT); renderLiveFlag(false); }
   const cached = loadCache();
-  if (cached) renderAll(cached);
+  if (cached) { renderAll(cached); }
   await refresh();
   $('#refreshBtn').addEventListener('click', refresh);
 }
