@@ -55,6 +55,15 @@ function jsonp(url, timeout = 9000) {
   });
 }
 
+/* 带重试的 JSONP 调用：东方财富对连续请求会限流，失败时等 1.5s 再试一次 */
+async function fetchRetry(fn, retries = 1, delay = 1500) {
+  let lastErr;
+  for (let i = 0; i <= retries; i++) {
+    try { return await fn(); } catch (e) { lastErr = e; if (i < retries) await new Promise(r => setTimeout(r, delay)); }
+  }
+  throw lastErr;
+}
+
 /* ---------------------- 数据拉取 ---------------------- */
 async function fetchBoard(fsCode) {
   const url = 'https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=2000&po=1&np=1&fltt=2&invt=2&fid=f3'
@@ -155,10 +164,10 @@ function signalOf(total) {
 async function gather() {
   const warns = [];
   let shMain = [], star = [], indices = [], news = null;
-  try { shMain = await fetchBoard('m:1+t:2'); } catch (e) { warns.push('上证主板行情获取失败'); }
-  try { star = await fetchBoard('m:1+t:23'); } catch (e) { warns.push('科创板行情获取失败'); }
-  try { indices = await fetchIndices(); } catch (e) { warns.push('指数快照获取失败'); }
-  try { news = await fetchNews(); } catch (e) { warns.push('公告获取失败'); }
+  try { shMain = await fetchRetry(() => fetchBoard('m:1+t:2')); } catch (e) { warns.push('上证主板行情获取失败（已重试）'); }
+  try { star = await fetchRetry(() => fetchBoard('m:1+t:23')); } catch (e) { warns.push('科创板行情获取失败（已重试）'); }
+  try { indices = await fetchRetry(() => fetchIndices()); } catch (e) { warns.push('指数快照获取失败（已重试）'); }
+  try { news = await fetchRetry(() => fetchNews()); } catch (e) { warns.push('公告获取失败（已重试）'); }
 
   const boards = {
     sh_main: { key: 'sh_main', name: '上证主板', items: rankBoard(shMain) },
@@ -170,11 +179,11 @@ async function gather() {
   if (snap && snap.boards) {
     if (boards.sh_main.items.length === 0 && snap.boards.sh_main) {
       boards.sh_main = snap.boards.sh_main;          // 整块替换，连名称/信号一并兜底
-      warns.push('上证主板实时获取失败，已回退算法快照');
+      warns.push('上证主板实时获取失败，已显示已存储数据');
     }
     if (boards.star.items.length === 0 && snap.boards.star) {
       boards.star = snap.boards.star;
-      warns.push('科创板实时获取失败，已回退算法快照');
+      warns.push('科创板实时获取失败，已显示已存储数据');
     }
   }
 
@@ -189,7 +198,7 @@ async function gather() {
   const usedSnap = boards.sh_main.items.length && boards.sh_main.items[0].source === 'algorithm';
   return {
     updatedAt: new Date().toISOString(),
-    source: warns.length ? '东方财富实时（部分回退算法快照）' : '东方财富（浏览器实时 JSONP 获取）',
+    source: warns.length ? '东方财富实时（部分显示已存储数据）' : '东方财富（浏览器实时 JSONP 获取）',
     live: !usedSnap,
     warns, indices, boards, news
   };
@@ -288,9 +297,21 @@ function renderAll(data) {
  * 关键原则（用户要求）：
  *   - 刷新期间界面继续显示【刷新前的旧数据】，不空白；
  *   - 只有拿到「有效数据」（两个板块都有股票）才覆盖 localStorage；
- *   - 拉取失败 / 超时 / 返回空 → 保留旧存储，继续显示旧数据并提示。
+ *   - 拉取失败 / 超时 / 返回空 → 保留旧存储，继续显示旧数据并提示；
+ *   - 加冷却时间：频繁点击会触发东方财富限流，15 秒内只许刷新一次。
  * ------------------------------------------------------------------------- */
+let lastRefreshAt = 0;
+const COOLDOWN_MS = 15000;
+
 async function refresh() {
+  const now = Date.now();
+  const remain = Math.ceil((COOLDOWN_MS - (now - lastRefreshAt)) / 1000);
+  if (now - lastRefreshAt < COOLDOWN_MS) {
+    renderWarns(['刷新太频繁，请 ' + remain + ' 秒后再试（避免触发数据源限流）']);
+    return;   // 不动存储、不空白，界面保持当前数据
+  }
+  lastRefreshAt = now;
+
   const btn = $('#refreshBtn');
   btn.disabled = true; btn.textContent = '⟳ 拉取中…';
   renderLiveFlag('loading');   // 顶部显示「正在获取」，同时旧数据仍留在界面
@@ -308,14 +329,14 @@ async function refresh() {
       // ⚠️ 实时未拿到有效数据 → 不动存储，继续显示已存的旧数据
       const store = loadCache() || window.SNAPSHOT;
       renderAll(store);
-      renderWarns(['实时数据获取不完整，已继续显示上次 / 快照数据']);
+      renderWarns(['实时数据获取不完整，已继续显示已存储数据']);
       renderLiveFlag(false);
     }
   } catch (e) {
     // ❌ 整段实时拉取异常 → 保留旧存储，继续显示已存数据，绝不空白
     const store = loadCache() || window.SNAPSHOT;
     renderAll(store);
-    renderWarns(['实时数据获取失败（' + (e && e.message || '网络异常') + '），已继续显示上次 / 快照数据']);
+    renderWarns(['实时数据获取失败（' + (e && e.message || '网络异常') + '），已继续显示已存储数据']);
     renderLiveFlag(false);
   } finally {
     btn.disabled = false; btn.textContent = '⟳ 刷新实时数据';
@@ -325,12 +346,12 @@ async function refresh() {
 function renderLiveFlag(state) {
   const el = $('#liveFlag');
   if (state === 'loading') {
-    el.textContent = '⟳ 正在获取实时数据…（当前显示上次数据）';
+    el.textContent = '⟳ 正在获取实时数据…（当前显示已存储数据）';
     el.classList.remove('live', 'snap'); el.classList.add('loading');
   } else if (state === true) {
     el.textContent = '● 浏览器实时'; el.classList.add('live'); el.classList.remove('snap', 'loading');
   } else {
-    el.textContent = '● 快照模式（显示已存储数据）'; el.classList.add('snap'); el.classList.remove('live', 'loading');
+    el.textContent = '● 显示已存储数据（实时获取失败）'; el.classList.add('snap'); el.classList.remove('live', 'loading');
   }
 }
 
@@ -342,6 +363,8 @@ async function init() {
   if (cached) { renderAll(cached); }
   await refresh();
   $('#refreshBtn').addEventListener('click', refresh);
+  // 页面打开时也记录一次时间，避免用户刚进页面就连点刷新
+  lastRefreshAt = Date.now();
 }
 
 init();
