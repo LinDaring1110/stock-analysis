@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>股票利好分析 · 双板块榜单</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">📈</span>
+      <div>
+        <h1>股票利好分析</h1>
+        <p class="subtitle">上证主板 · 科创板 双板块实时排名</p>
+      </div>
+    </div>
+    <div class="actions">
+      <span id="liveFlag" class="live">● 浏览器实时</span>
+      <span id="updatedAt" class="updated">数据加载中…</span>
+      <button id="refreshBtn" class="btn-refresh">⟳ 刷新实时数据</button>
+    </div>
+  </header>
+
+  <div id="warnBanner" class="warn-banner hidden"></div>
+
+  <main class="container">
+    <!-- 市场指数概览 -->
+    <section class="indices" id="indices">
+      <h2 class="section-title">市场指数</h2>
+      <div class="index-grid" id="indexGrid"></div>
+    </section>
+
+    <!-- 双板块排名 -->
+    <div class="boards">
+      <section class="board" id="board-sh_main">
+        <div class="board-head">
+          <h2 class="section-title">上证主板 · 利好前 20</h2>
+          <span class="badge" id="count-sh_main"></span>
+        </div>
+        <div class="table" id="table-sh_main"></div>
+      </section>
+
+      <section class="board" id="board-star">
+        <div class="board-head">
+          <h2 class="section-title">科创板 · 利好前 20</h2>
+          <span class="badge" id="count-star"></span>
+        </div>
+        <div class="table" id="table-star"></div>
+      </section>
+    </div>
+
+    <!-- 实时资讯 -->
+    <section class="news">
+      <h2 class="section-title">实时股市资讯</h2>
+      <div class="news-list" id="newsList"></div>
+    </section>
+
+    <footer class="foot">
+      <span id="source">数据来源：东方财富（浏览器实时 JSONP 获取）</span>
+      <span class="storage-note">本地存储：localStorage（刷新时覆盖更新）</span>
+    </footer>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
