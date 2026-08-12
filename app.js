@@ -195,14 +195,16 @@ function renderBoard(key, board) {
     const sig = signalOf(s.score.total);
     el.innerHTML += `<div class="stock-row">
       <div class="rank">${s.rank}</div>
-      <div><div class="name">${s.name}</div><div class="code">${s.code}</div></div>
-      <div class="price ${up ? 'up' : 'down'}">${s.price != null ? s.price.toFixed(2) : '—'}</div>
-      <div class="chg ${up ? 'up' : 'down'}">${s.changePct != null ? (up ? '+' : '') + s.changePct.toFixed(2) + '%' : '—'}</div>
-      <div class="score-wrap">
-        <div class="score-bar"><div class="score-fill" style="width:${Math.min(100, s.score.total)}%"></div></div>
-        <span class="score-num">${s.score.total}</span>
-        <span class="signal ${sig.cls}">${sig.text}</span>
+      <div class="nm"><div class="name">${s.name}</div><div class="code">${s.code}</div></div>
+      <div class="metrics">
+        <div class="price ${up ? 'up' : 'down'}">${s.price != null ? s.price.toFixed(2) : '—'}</div>
+        <div class="chg ${up ? 'up' : 'down'}">${s.changePct != null ? (up ? '+' : '') + s.changePct.toFixed(2) + '%' : '—'}</div>
+        <div class="score-wrap">
+          <div class="score-bar"><div class="score-fill" style="width:${Math.min(100, s.score.total)}%"></div></div>
+          <span class="score-num">${s.score.total}</span>
+        </div>
       </div>
+      <span class="signal ${sig.cls}">${sig.text}</span>
     </div>`;
   });
 }
