@@ -12,13 +12,12 @@
       <span class="logo">📈</span>
       <div>
         <h1>股票利好分析</h1>
-        <p class="subtitle">上证主板 · 科创板 双板块实时排名</p>
+        <p class="subtitle">上证主板 · 科创板 双板块榜单 + 小苏预测</p>
       </div>
     </div>
     <div class="actions">
-      <span id="liveFlag" class="live">● 浏览器实时</span>
+      <span id="liveFlag" class="snap">● 静态算法快照</span>
       <span id="updatedAt" class="updated">数据加载中…</span>
-      <button id="refreshBtn" class="btn-refresh">⟳ 刷新实时数据</button>
     </div>
   </header>
 
@@ -50,6 +49,16 @@
       </section>
     </div>
 
+    <!-- 小苏预测板块（独立板块，仅展示两只指定股票的预测结果） -->
+    <section class="board" id="board-predict">
+      <div class="board-head">
+        <h2 class="section-title">小苏预测板块</h2>
+        <span class="badge" id="count-predict"></span>
+      </div>
+      <p class="predict-sub">基于 <b>data/ 技术指标算法</b>（MA / MACD / KDJ / RSI / BIAS / OBV）对前复权日K线测算，仅作技术面参考，不构成投资建议。</p>
+      <div class="pred-cards" id="predCards"></div>
+    </section>
+
     <!-- 实时资讯 -->
     <section class="news">
       <h2 class="section-title">实时股市资讯</h2>
@@ -58,11 +67,12 @@
 
     <footer class="foot">
       <span id="source">数据来源：东方财富（浏览器实时 JSONP 获取）</span>
-      <span class="storage-note">本地快照：每次刷新成功即自动更新为最新有效数据</span>
+      <span class="storage-note">数据说明：双板块为算法快照（静态）；小苏预测板块基于 data/ 技术指标算法测算，仅供参考</span>
     </footer>
   </main>
 
   <script src="snapshot.js"></script>
+  <script src="site_data.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
