@@ -24,6 +24,16 @@
   <div id="warnBanner" class="warn-banner hidden"></div>
 
   <main class="container">
+    <!-- 小苏预测板块（独立板块，仅展示两只指定股票的预测结果） -->
+    <section class="board" id="board-predict">
+      <div class="board-head">
+        <h2 class="section-title">小苏预测板块</h2>
+        <span class="badge" id="count-predict"></span>
+      </div>
+      <p class="predict-sub">基于 <b>data/ 技术指标算法</b>（MA / MACD / KDJ / RSI / BIAS / OBV）对前复权日K线测算，仅作技术面参考，不构成投资建议。</p>
+      <div class="pred-cards" id="predCards"></div>
+    </section>
+
     <!-- 市场指数概览 -->
     <section class="indices" id="indices">
       <h2 class="section-title">市场指数</h2>
@@ -48,16 +58,6 @@
         <div class="table" id="table-star"></div>
       </section>
     </div>
-
-    <!-- 小苏预测板块（独立板块，仅展示两只指定股票的预测结果） -->
-    <section class="board" id="board-predict">
-      <div class="board-head">
-        <h2 class="section-title">小苏预测板块</h2>
-        <span class="badge" id="count-predict"></span>
-      </div>
-      <p class="predict-sub">基于 <b>data/ 技术指标算法</b>（MA / MACD / KDJ / RSI / BIAS / OBV）对前复权日K线测算，仅作技术面参考，不构成投资建议。</p>
-      <div class="pred-cards" id="predCards"></div>
-    </section>
 
     <!-- 实时资讯 -->
     <section class="news">
