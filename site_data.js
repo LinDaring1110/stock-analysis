@@ -2,27 +2,27 @@
 window.STATIC_INDICES = [
   {
     "name": "上证指数",
-    "price": 3927.18,
-    "changePct": 0.01
+    "price": 3990.3,
+    "changePct": 0.19
   },
   {
     "name": "沪深300",
-    "price": 4665.88,
-    "changePct": 0.04
+    "price": 4725.81,
+    "changePct": -0.32
   },
   {
     "name": "深证成指",
-    "price": 14354.31,
-    "changePct": 0.45
+    "price": 14622.5,
+    "changePct": -0.56
   },
   {
     "name": "创业板指",
-    "price": 3626.3,
-    "changePct": 1.12
+    "price": 3705.56,
+    "changePct": -0.93
   },
   {
     "name": "科创50",
-    "price": 1717.68,
-    "changePct": -0.0
+    "price": 1790.87,
+    "changePct": 0.11
   }
 ];
