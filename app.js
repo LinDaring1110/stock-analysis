@@ -166,6 +166,31 @@ function renderPrediction(data) {
   });
 }
 
+/* 季度利润增长榜（前50） */
+function renderProfitGrowth(data) {
+  const el = $('#table-profit');
+  if (!el || !data) return;
+  const items = data.items || [];
+  $('#count-profit').textContent = items.length + ' 只';
+  el.innerHTML = '';
+  items.forEach((s, i) => {
+    const g = (s.growth != null) ? s.growth : 0;
+    const up = g >= 0;
+    const sig = g >= 100 ? { cls: 'sig-strong', text: '利润高增' }
+              : g >= 0    ? { cls: 'sig-bull',   text: '利润增长' }
+              :             { cls: 'sig-weak',   text: '利润下滑' };
+    el.innerHTML += `<div class="stock-row">
+      <div class="rank">${i + 1}</div>
+      <div class="nm"><div class="name">${s.name}</div><div class="code">${s.code} · ${s.market || ''}</div></div>
+      <div class="metrics">
+        <div class="pgrow ${up ? 'up' : 'down'}">${up ? '+' : ''}${g.toFixed(2)}%</div>
+        <div class="pperiod">${data.period || s.report || ''} 同比</div>
+      </div>
+      <span class="signal ${sig.cls}">${sig.text}</span>
+    </div>`;
+  });
+}
+
 /* 启动（静态渲染） */
 function init() {
   const snap = window.SNAPSHOT || {};
@@ -181,8 +206,10 @@ function init() {
   renderTimestamp(snap.updatedAt);
   renderWarns(snap.warns || []);
   $('#source').textContent = '双板块来源：' + (snap.source || '算法快照')
-    + '；预测来源：' + ((window.PREDICTION && window.PREDICTION.source) || '');
+    + '；预测来源：' + ((window.PREDICTION && window.PREDICTION.source) || '')
+    + '；利润增长来源：' + ((window.PROFIT_GROWTH && window.PROFIT_GROWTH.source) || '');
   renderPrediction(window.PREDICTION);
+  renderProfitGrowth(window.PROFIT_GROWTH);
 
   // 顶栏状态：静态算法快照
   const flag = $('#liveFlag');
