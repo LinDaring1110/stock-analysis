@@ -51,6 +51,7 @@ function renderBoard(key, board) {
   el.innerHTML = '';
   (board.items || []).forEach(s => {
     const up = (s.changePct != null && s.changePct >= 0);
+    const qUp = (s.qRet != null && s.qRet >= 0);
     const sig = signalOf(s.score.total);
     el.innerHTML += `<div class="stock-row">
       <div class="rank">${s.rank}</div>
@@ -58,6 +59,7 @@ function renderBoard(key, board) {
       <div class="metrics">
         <div class="price ${up ? 'up' : 'down'}">${s.price != null ? s.price.toFixed(2) : '—'}</div>
         <div class="chg ${up ? 'up' : 'down'}">${s.changePct != null ? (up ? '+' : '') + s.changePct.toFixed(2) + '%' : '—'}</div>
+        <div class="qret ${qUp ? 'up' : 'down'}" title="最近一个季度收益率">季 ${qUp ? '+' : ''}${s.qRet != null ? s.qRet.toFixed(2) : '—'}%</div>
         <div class="score-wrap">
           <div class="score-bar"><div class="score-fill" style="width:${Math.min(100, s.score.total)}%"></div></div>
           <span class="score-num">${s.score.total}</span>
